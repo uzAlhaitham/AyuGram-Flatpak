@@ -66,17 +66,17 @@ jobs:
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
           echo "Using bundle: $BUNDLE"
           
-          # 1. Cleanup
+          # ===== 1. Vaqtinchalik repo yaratish =====
           rm -rf /tmp/tmprepo /tmp/app
-          
-          # 2. Import bundle — flatpak o'zi repo yaratadi
+          mkdir -p /tmp/tmprepo
+          ostree init --repo=/tmp/tmprepo --mode=archive-z2
           flatpak build-import-bundle /tmp/tmprepo "$BUNDLE"
           
-          # 3. App fayllarini chiqarish
+          # ===== 2. App fayllarini chiqarish =====
           mkdir -p /tmp/app
           ostree --repo=/tmp/tmprepo checkout app/com.ayugram.desktop/x86_64/master /tmp/app
           
-          # 4. Metainfo faylini topish va tuzatish
+          # ===== 3. Metainfo faylini tuzatish =====
           echo "=== Metainfo files ==="
           find /tmp/app -name "*.metainfo.xml" -o -name "*.appdata.xml" 2>/dev/null
           
@@ -87,14 +87,17 @@ jobs:
             grep -E 'type=' "$file" | head -5 || true
           done
           
-          # 5. Yangi repo, stable branch bilan (flatpak build-export o'zi yaratadi)
+          # ===== 4. Yangi repo, stable branch bilan =====
           rm -rf repo
+          mkdir -p repo
+          ostree init --repo=repo --mode=archive-z2
+          
           flatpak build-export \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
               repo /tmp/app com.ayugram.desktop stable
           
-          # 6. Summary'ni imzolash
+          # ===== 5. Summary'ni imzolash =====
           flatpak build-update-repo \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
