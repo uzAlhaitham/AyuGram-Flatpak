@@ -58,57 +58,25 @@ jobs:
             echo "$GPG_PASSPHRASE" | "$PRESET" --preset "$KG" || true
           done
 
-      - name: Build Flatpak repository (stable branch)
+      - name: Build Flatpak repository
         env:
           GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
         run: |
           mkdir -p public
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
           echo "Using bundle: $BUNDLE"
-          
-          # ===== 1. Import bundle (ostree init siz) =====
-          rm -rf repo
-          flatpak build-import-bundle repo "$BUNDLE"
-          
-          echo "=== After import ==="
-          ostree --repo=repo refs | grep ayugram || true
-          
-          # ===== 2. Extract app =====
-          rm -rf app_extract
-          mkdir -p app_extract
-          ostree --repo=repo checkout app/com.ayugram.desktop/x86_64/master app_extract
-          
-          # ===== 3. Patch metainfo =====
-          echo "=== Metainfo files ==="
-          find app_extract -name "*.metainfo.xml" -o -name "*.appdata.xml" 2>/dev/null || true
-          find app_extract \( -name "*.metainfo.xml" -o -name "*.appdata.xml" \) -print0 | while IFS= read -r -d '' file; do
-            echo "--- Patching: $file ---"
-            sed -i 's/type="development"/type="stable"/g' "$file"
-            sed -i 's/type="snapshot"/type="stable"/g' "$file"
-            grep -oE 'type="[a-z]+"' "$file" | sort -u || true
-          done
-          
-          # ===== 4. Export to stable branch =====
-          flatpak build-export \
+          mkdir -p repo
+          ostree init --repo=repo --mode=archive-z2
+          flatpak build-import-bundle \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
-              repo app_extract com.ayugram.desktop stable
-          
-          # ===== 5. Delete master branch =====
-          ostree --repo=repo refs -d app/com.ayugram.desktop/x86_64/master || true
-          
-          # ===== 6. Update summary =====
+              repo "$BUNDLE"
           flatpak build-update-repo \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
               repo
-          
-          echo "=== Branch check ==="
-          ostree --repo=repo refs | grep ayugram || true
-          
-          echo "=== Summary files ==="
+          echo "=== Summary signature check ==="
           ls -la repo/summary*
-          
           mv repo public/repo
           cp ayugram.flatpakrepo public/
           cat > public/index.html << 'HTML'
