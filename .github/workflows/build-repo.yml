@@ -18,16 +18,28 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
-      - name: Find flatpak bundle
-        id: find-bundle
-        run: echo "file=$(ls ayugram-desktop-*.flatpak | head -n1)" >> $GITHUB_OUTPUT
+      - name: Install flatpak
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak
 
       - name: Build Flatpak repository
-        uses: andyholmes/flatter@main
+        run: |
+          mkdir -p public
+          BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
+          echo "Using bundle: $BUNDLE"
+          flatpak build-import-bundle repo "$BUNDLE"
+          flatpak build-update-repo repo
+          mv repo public/repo
+          cp ayugram.flatpakrepo public/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          files: ${{ steps.find-bundle.outputs.file }}
-          upload-pages-artifact: true
+          path: public
 
       - name: Deploy to GitHub Pages
         id: deployment
