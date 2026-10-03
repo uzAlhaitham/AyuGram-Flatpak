@@ -32,21 +32,17 @@ jobs:
         run: |
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
-          
           cat > ~/.gnupg/gpg.conf << 'CONF'
           use-agent
           pinentry-mode loopback
           no-tty
           batch
           CONF
-          
           cat > ~/.gnupg/gpg-agent.conf << 'CONF'
           allow-loopback-pinentry
           CONF
-          
           chmod 600 ~/.gnupg/gpg.conf ~/.gnupg/gpg-agent.conf
           gpgconf --kill gpg-agent || true
-          
           echo "$GPG_PRIVATE_KEY_B64" | base64 -d | gpg --batch --import
           gpg --list-secret-keys --keyid-format=long
 
@@ -55,15 +51,16 @@ jobs:
           GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
+          # 1. 'public' papkasini yaratish (bu saytning ildizi bo'ladi)
           mkdir -p public
+
+          # 2. Flatpak repozitoriyasini yaratish va imzolash
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
           echo "Using bundle: $BUNDLE"
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
           flatpak build-import-bundle repo "$BUNDLE"
-          
           flatpak build-update-repo repo
-          
           gpg --batch --yes \
               --pinentry-mode loopback \
               --passphrase "$GPG_PASSPHRASE" \
@@ -71,12 +68,14 @@ jobs:
               --local-user "$GPG_FINGERPRINT" \
               -o repo/summary.sig \
               repo/summary
-          
-          echo "=== Signature created ==="
-          ls -la repo/summary*
-          
+
+          # 3. Repozitoriya papkasini 'public' ichiga ko'chirish
           mv repo public/repo
+
+          # 4. .flatpakrepo faylini 'public' ildiziga nusxalash
           cp ayugram.flatpakrepo public/
+
+          # 5. 'public' ildizida 'index.html' yaratish
           cat > public/index.html << 'HTML'
           <!DOCTYPE html>
           <html><head><title>AyuGram Flatpak Repo</title></head>
