@@ -28,9 +28,9 @@ jobs:
 
       - name: Import GPG key
         env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PRIVATE_KEY_B64: ${{ secrets.GPG_PRIVATE_KEY }}
         run: |
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "$GPG_PRIVATE_KEY_B64" | base64 -d | gpg --batch --import
           gpg --list-secret-keys --keyid-format=long
 
       - name: Build Flatpak repository
