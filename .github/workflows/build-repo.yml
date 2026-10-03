@@ -66,56 +66,52 @@ jobs:
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
           echo "Using bundle: $BUNDLE"
           
-          TMPREPO=/tmp/ayugram_tmprepo
-          FINAL_REPO=/tmp/ayugram_finalrepo
-          APP_EXTRACT=/tmp/ayugram_app
+          # ===== 1. Import bundle to master branch (working pattern) =====
+          rm -rf repo
+          mkdir -p repo
+          ostree init --repo=repo --mode=archive-z2
+          flatpak build-import-bundle \
+              --gpg-sign="$GPG_FINGERPRINT" \
+              --gpg-homedir="$HOME/.gnupg" \
+              repo "$BUNDLE"
           
-          # ===== 1. Cleanup =====
-          rm -rf "$TMPREPO" "$FINAL_REPO" "$APP_EXTRACT"
+          # ===== 2. Extract app =====
+          rm -rf app_extract
+          mkdir -p app_extract
+          ostree --repo=repo checkout app/com.ayugram.desktop/x86_64/master app_extract
           
-          # ===== 2. TMPREPO yaratish va bundle import =====
-          mkdir -p "$TMPREPO"
-          ostree init --repo="$TMPREPO" --mode=archive-z2
-          flatpak build-import-bundle "$TMPREPO" "$BUNDLE"
-          
-          # ===== 3. App fayllarini chiqarish =====
-          mkdir -p "$APP_EXTRACT"
-          ostree --repo="$TMPREPO" checkout app/com.ayugram.desktop/x86_64/master "$APP_EXTRACT"
-          
-          # ===== 4. Metainfo tuzatish =====
+          # ===== 3. Patch metainfo =====
           echo "=== Metainfo files ==="
-          find "$APP_EXTRACT" -name "*.metainfo.xml" -o -name "*.appdata.xml" 2>/dev/null
-          
-          find "$APP_EXTRACT" \( -name "*.metainfo.xml" -o -name "*.appdata.xml" \) -print0 | while IFS= read -r -d '' file; do
+          find app_extract -name "*.metainfo.xml" -o -name "*.appdata.xml" 2>/dev/null || true
+          find app_extract \( -name "*.metainfo.xml" -o -name "*.appdata.xml" \) -print0 | while IFS= read -r -d '' file; do
             echo "--- Patching: $file ---"
             sed -i 's/type="development"/type="stable"/g' "$file"
             sed -i 's/type="snapshot"/type="stable"/g' "$file"
-            grep -E 'type=' "$file" | head -5 || true
+            grep -oE 'type="[a-z]+"' "$file" | sort -u || true
           done
           
-          # ===== 5. FINAL_REPO yaratish va stable branch bilan eksport =====
-          mkdir -p "$FINAL_REPO"
-          ostree init --repo="$FINAL_REPO" --mode=archive-z2
-          
+          # ===== 4. Export to stable branch (same repo) =====
           flatpak build-export \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
-              "$FINAL_REPO" "$APP_EXTRACT" com.ayugram.desktop stable
+              repo app_extract com.ayugram.desktop stable
           
-          # ===== 6. Summary imzolash =====
+          # ===== 5. Delete master branch =====
+          ostree --repo=repo refs -d app/com.ayugram.desktop/x86_64/master || true
+          
+          # ===== 6. Update summary =====
           flatpak build-update-repo \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
-              "$FINAL_REPO"
+              repo
           
           echo "=== Branch check ==="
-          ostree --repo="$FINAL_REPO" refs | grep ayugram || true
+          ostree --repo=repo refs | grep ayugram || true
           
           echo "=== Summary files ==="
-          ls -la "$FINAL_REPO"/summary* || true
+          ls -la repo/summary*
           
-          # ===== 7. Public ga ko'chirish =====
-          cp -r "$FINAL_REPO" public/repo
+          mv repo public/repo
           cp ayugram.flatpakrepo public/
           cat > public/index.html << 'HTML'
           <!DOCTYPE html>
