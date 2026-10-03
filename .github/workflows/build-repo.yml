@@ -58,7 +58,7 @@ jobs:
             echo "$GPG_PASSPHRASE" | "$PRESET" --preset "$KG" || true
           done
 
-      - name: Build Flatpak repository
+      - name: Build Flatpak repository (stable branch)
         env:
           GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
         run: |
@@ -66,52 +66,45 @@ jobs:
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
           echo "Using bundle: $BUNDLE"
           
-          # 1. Setup temporary repo
-          mkdir -p repo
-          ostree init --repo=repo --mode=archive-z2
+          # 1. Temporary repo — bundle'ni import qilish uchun
+          rm -rf /tmp/tmprepo /tmp/app
+          mkdir -p /tmp/tmprepo
+          ostree init --repo=/tmp/tmprepo --mode=archive-z2
+          flatpak build-import-bundle /tmp/tmprepo "$BUNDLE"
           
-          # 2. Import bundle (temporary, to get files)
-          flatpak build-import-bundle repo "$BUNDLE"
-          
-          # 3. Checkout app files to a directory
-          rm -rf /tmp/app
+          # 2. App fayllarini chiqarish
           mkdir -p /tmp/app
-          ostree --repo=repo checkout app/com.ayugram.desktop/x86_64/master /tmp/app
+          ostree --repo=/tmp/tmprepo checkout app/com.ayugram.desktop/x86_64/master /tmp/app
           
-          # 4. Inspect and modify metainfo
-          echo "=== Metainfo files found ==="
+          # 3. Metainfo faylini topish va tuzatish
+          echo "=== Metainfo files ==="
           find /tmp/app -name "*.metainfo.xml" -o -name "*.appdata.xml" 2>/dev/null
-          echo ""
           
           find /tmp/app \( -name "*.metainfo.xml" -o -name "*.appdata.xml" \) -print0 | while IFS= read -r -d '' file; do
-            echo "--- Processing: $file ---"
-            echo "Before:"
-            grep -E 'type=' "$file" | head -20 || true
+            echo "--- Patching: $file ---"
             sed -i 's/type="development"/type="stable"/g' "$file"
             sed -i 's/type="snapshot"/type="stable"/g' "$file"
-            echo "After:"
-            grep -E 'type=' "$file" | head -20 || true
+            grep -E 'type=' "$file" | head -5 || true
           done
           
-          # 5. Recreate repo cleanly
-          rm -rf repo
+          # 4. Yangi repo, stable branch bilan
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
           
-          # 6. Export modified app
           flatpak build-export \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
-              repo /tmp/app com.ayugram.desktop master
+              repo /tmp/app com.ayugram.desktop stable
           
-          # 7. Update repo with GPG signing
+          # 5. Summary'ni imzolash
           flatpak build-update-repo \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
               repo
           
-          # Show results
-          echo ""
+          echo "=== Branch check ==="
+          ostree --repo=repo refs | grep ayugram
+          
           echo "=== Summary files ==="
           ls -la repo/summary*
           
