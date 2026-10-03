@@ -51,20 +51,16 @@ jobs:
           GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          # 1. 'public' papkasini yaratish (bu saytning ildizi bo'ladi)
+          # 1. 'public' papkasini yaratish (saytning ildizi)
           mkdir -p public
 
-          # 2. Flatpak repozitoriyasini yaratish
+          # 2. Flatpak repozitoriyasini yaratish va imzolash
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
           echo "Using bundle: $BUNDLE"
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
           flatpak build-import-bundle repo "$BUNDLE"
-
-          # 3. Repo metama'lumotlarini yaratish (imzosiz)
           flatpak build-update-repo repo
-
-          # 4. Summary faylini GPG bilan imzolash
           gpg --batch --yes \
               --pinentry-mode loopback \
               --passphrase "$GPG_PASSPHRASE" \
@@ -73,13 +69,13 @@ jobs:
               -o repo/summary.sig \
               repo/summary
 
-          # 5. 'repo' papkasini 'public' ichiga ko'chirish
+          # 3. Repo papkasini public ichiga ko'chirish
           mv repo public/repo
 
-          # 6. .flatpakrepo faylini 'public' ildiziga nusxalash
+          # 4. .flatpakrepo faylini public ildiziga nusxalash
           cp ayugram.flatpakrepo public/
 
-          # 7. 'public' ildizida 'index.html' yaratish
+          # 5. public ildizida index.html yaratish
           cat > public/index.html << 'HTML'
           <!DOCTYPE html>
           <html><head><title>AyuGram Flatpak Repo</title></head>
@@ -88,17 +84,27 @@ jobs:
           </body></html>
           HTML
 
-          # 8. Tekshirish uchun 'public' papkasi ichini ko'rsatish
-          echo "=== public papkasi tarkibi ==="
-          ls -la public
-          echo "=== public/repo papkasi tarkibi ==="
-          ls -la public/repo
+          # 6. public/repo/ ichida ham index.html yaratish (404 oldini olish uchun)
+          cat > public/repo/index.html << 'HTML'
+          <!DOCTYPE html>
+          <html><head><title>AyuGram Flatpak Repo - Files</title></head>
+          <body>
+          <h1>Flatpak Repozitoriyasi Fayllari</h1>
+          <ul>
+            <li><a href="config">config</a></li>
+            <li><a href="summary">summary</a></li>
+            <li><a href="summary.sig">summary.sig</a></li>
+            <li><a href="objects/">objects/</a></li>
+            <li><a href="refs/">refs/</a></li>
+          </ul>
+          </body></html>
+          HTML
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: public
-          include-hidden-files: true   # Yashirin fayllarni ham qo'shish
+          include-hidden-files: true
 
       - name: Deploy to GitHub Pages
         id: deployment
