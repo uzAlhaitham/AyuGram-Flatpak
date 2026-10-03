@@ -66,14 +66,12 @@ jobs:
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
           echo "Using bundle: $BUNDLE"
           
-          # ===== 1. Import bundle to master branch (working pattern) =====
+          # ===== 1. Import bundle (ostree init siz) =====
           rm -rf repo
-          mkdir -p repo
-          ostree init --repo=repo --mode=archive-z2
-          flatpak build-import-bundle \
-              --gpg-sign="$GPG_FINGERPRINT" \
-              --gpg-homedir="$HOME/.gnupg" \
-              repo "$BUNDLE"
+          flatpak build-import-bundle repo "$BUNDLE"
+          
+          echo "=== After import ==="
+          ostree --repo=repo refs | grep ayugram || true
           
           # ===== 2. Extract app =====
           rm -rf app_extract
@@ -90,7 +88,7 @@ jobs:
             grep -oE 'type="[a-z]+"' "$file" | sort -u || true
           done
           
-          # ===== 4. Export to stable branch (same repo) =====
+          # ===== 4. Export to stable branch =====
           flatpak build-export \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
