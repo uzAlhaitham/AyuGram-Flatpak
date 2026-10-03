@@ -41,6 +41,25 @@ This repository would not exist without the hard work of others. All credit for 
 ### Tools
 - **[andyholmes/flatter](https://github.com/andyholmes/flatter)** — GitHub Action used during early development.
 
+## Known Issues
+
+### "BETA" label in GNOME Software
+
+GNOME Software displays a **BETA** badge next to AyuGram, even though this is a stable release. This is a **cosmetic issue** only — the application works fully and all updates are delivered normally.
+
+**Why this happens:**
+- The upstream `.flatpak` bundle from [0FL01/AyuGramDesktop-flatpak](https://github.com/0FL01/AyuGramDesktop-flatpak) is built for the `master` branch
+- GNOME Software interprets the `master` branch as a development/pre-release channel and shows the BETA badge
+- The BETA label comes from the app's AppStream metadata (`metainfo.xml` inside the bundle), not from this repository
+
+**Attempted fixes (unsuccessful):**
+- Renaming the branch from `master` to `stable` via `flatpak build-export` — Flatpak's `build-import-bundle` does not support branch renaming
+- Patching `metainfo.xml` inside the bundle before re-exporting — caused OSTree repository conflicts and GPG signing failures in GitHub Actions
+
+**Status:** Not fixed. The issue is purely visual and does not affect functionality.
+
+If you know a reliable way to fix this without breaking the GPG-signed automated workflow, please open an issue or a pull request.
+
 ## Installation
 
 Add the repository and install AyuGram:
