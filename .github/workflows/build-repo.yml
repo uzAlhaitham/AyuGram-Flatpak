@@ -30,10 +30,20 @@ jobs:
         env:
           GPG_PRIVATE_KEY_B64: ${{ secrets.GPG_PRIVATE_KEY }}
         run: |
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          echo "use-agent" >> ~/.gnupg/gpg.conf
+          gpgconf --kill gpg-agent || true
+          gpg-connect-agent reloadagent /bye || true
+
           echo "$GPG_PRIVATE_KEY_B64" | base64 -d | gpg --batch --import
           gpg --list-secret-keys --keyid-format=long
 
       - name: Build Flatpak repository
+        env:
+          GPG_TTY: /dev/null
         run: |
           mkdir -p public
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
