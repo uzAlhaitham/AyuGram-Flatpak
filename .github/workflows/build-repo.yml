@@ -24,7 +24,14 @@ jobs:
       - name: Install flatpak and ostree
         run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak ostree
+          sudo apt-get install -y flatpak ostree gnupg
+
+      - name: Import GPG key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --list-secret-keys --keyid-format=long
 
       - name: Build Flatpak repository
         run: |
@@ -34,18 +41,15 @@ jobs:
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
           flatpak build-import-bundle repo "$BUNDLE"
-          flatpak build-update-repo repo
+          flatpak build-update-repo --gpg-sign=${{ secrets.GPG_FINGERPRINT }} repo
           mv repo public/repo
           cp ayugram.flatpakrepo public/
           cat > public/index.html << 'HTML'
           <!DOCTYPE html>
-          <html>
-          <head><title>AyuGram Flatpak Repo</title></head>
-          <body>
-          <h1>AyuGram Flatpak Repozitoriyasi</h1>
-          <p>Repo manzili: <code>https://uzAlhaitham.github.io/AyuGram-Flatpak/ayugram.flatpakrepo</code></p>
-          </body>
-          </html>
+          <html><head><title>AyuGram Flatpak Repo</title></head>
+          <body><h1>AyuGram Flatpak Repozitoriyasi</h1>
+          <p>Repo: <code>https://uzAlhaitham.github.io/AyuGram-Flatpak/ayugram.flatpakrepo</code></p>
+          </body></html>
           HTML
 
       - name: Upload artifact
