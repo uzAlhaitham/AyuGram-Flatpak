@@ -54,13 +54,17 @@ jobs:
           # 1. 'public' papkasini yaratish (bu saytning ildizi bo'ladi)
           mkdir -p public
 
-          # 2. Flatpak repozitoriyasini yaratish va imzolash
+          # 2. Flatpak repozitoriyasini yaratish
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
           echo "Using bundle: $BUNDLE"
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
           flatpak build-import-bundle repo "$BUNDLE"
+
+          # 3. Repo metama'lumotlarini yaratish (imzosiz)
           flatpak build-update-repo repo
+
+          # 4. Summary faylini GPG bilan imzolash
           gpg --batch --yes \
               --pinentry-mode loopback \
               --passphrase "$GPG_PASSPHRASE" \
@@ -69,13 +73,13 @@ jobs:
               -o repo/summary.sig \
               repo/summary
 
-          # 3. Repozitoriya papkasini 'public' ichiga ko'chirish
+          # 5. 'repo' papkasini 'public' ichiga ko'chirish
           mv repo public/repo
 
-          # 4. .flatpakrepo faylini 'public' ildiziga nusxalash
+          # 6. .flatpakrepo faylini 'public' ildiziga nusxalash
           cp ayugram.flatpakrepo public/
 
-          # 5. 'public' ildizida 'index.html' yaratish
+          # 7. 'public' ildizida 'index.html' yaratish
           cat > public/index.html << 'HTML'
           <!DOCTYPE html>
           <html><head><title>AyuGram Flatpak Repo</title></head>
@@ -84,10 +88,17 @@ jobs:
           </body></html>
           HTML
 
+          # 8. Tekshirish uchun 'public' papkasi ichini ko'rsatish
+          echo "=== public papkasi tarkibi ==="
+          ls -la public
+          echo "=== public/repo papkasi tarkibi ==="
+          ls -la public/repo
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: public
+          include-hidden-files: true   # Yashirin fayllarni ham qo'shish
 
       - name: Deploy to GitHub Pages
         id: deployment
