@@ -51,52 +51,26 @@ jobs:
           GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          # 1. 'public' papkasini yaratish (saytning ildizi)
           mkdir -p public
-
-          # 2. Flatpak repozitoriyasini yaratish va imzolash
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
           echo "Using bundle: $BUNDLE"
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
           flatpak build-import-bundle repo "$BUNDLE"
-          flatpak build-update-repo repo
-          gpg --batch --yes \
-              --pinentry-mode loopback \
-              --passphrase "$GPG_PASSPHRASE" \
-              --detach-sign --armor \
-              --local-user "$GPG_FINGERPRINT" \
-              -o repo/summary.sig \
-              repo/summary
-
-          # 3. Repo papkasini public ichiga ko'chirish
+          
+          # Eng muhim o'zgarish: summary'ni to'g'ridan-to'g'ri imzolash
+          flatpak build-update-repo \
+              --gpg-sign="$GPG_FINGERPRINT" \
+              --gpg-homedir="$HOME/.gnupg" \
+              repo
+          
           mv repo public/repo
-
-          # 4. .flatpakrepo faylini public ildiziga nusxalash
           cp ayugram.flatpakrepo public/
-
-          # 5. public ildizida index.html yaratish
           cat > public/index.html << 'HTML'
           <!DOCTYPE html>
           <html><head><title>AyuGram Flatpak Repo</title></head>
           <body><h1>AyuGram Flatpak Repozitoriyasi</h1>
           <p>Repo: <code>https://uzAlhaitham.github.io/AyuGram-Flatpak/ayugram.flatpakrepo</code></p>
-          </body></html>
-          HTML
-
-          # 6. public/repo/ ichida ham index.html yaratish (404 oldini olish uchun)
-          cat > public/repo/index.html << 'HTML'
-          <!DOCTYPE html>
-          <html><head><title>AyuGram Flatpak Repo - Files</title></head>
-          <body>
-          <h1>Flatpak Repozitoriyasi Fayllari</h1>
-          <ul>
-            <li><a href="config">config</a></li>
-            <li><a href="summary">summary</a></li>
-            <li><a href="summary.sig">summary.sig</a></li>
-            <li><a href="objects/">objects/</a></li>
-            <li><a href="refs/">refs/</a></li>
-          </ul>
           </body></html>
           HTML
 
