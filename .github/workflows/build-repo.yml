@@ -19,10 +19,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Find flatpak bundle
+        id: find-bundle
+        run: echo "file=$(ls ayugram-desktop-*.flatpak | head -n1)" >> $GITHUB_OUTPUT
+
       - name: Build Flatpak repository
         uses: andyholmes/flatter@main
         with:
-          files: ayugram-desktop-*.flatpak
+          files: ${{ steps.find-bundle.outputs.file }}
           upload-pages-artifact: true
 
       - name: Deploy to GitHub Pages
