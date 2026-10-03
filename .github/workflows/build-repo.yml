@@ -77,9 +77,14 @@ jobs:
           echo "Using bundle: $BUNDLE"
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
-          flatpak build-import-bundle repo "$BUNDLE"
           
-          # MUHIM: build-update-repo'ga --gpg-sign va --gpg-homedir qo'shamiz
+          # 1. Import qilishda ham commitni imzolash
+          flatpak build-import-bundle \
+              --gpg-sign="$GPG_FINGERPRINT" \
+              --gpg-homedir="$HOME/.gnupg" \
+              repo "$BUNDLE"
+          
+          # 2. Summary faylini imzolash
           flatpak build-update-repo \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
