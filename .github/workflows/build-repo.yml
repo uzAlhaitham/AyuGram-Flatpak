@@ -66,23 +66,23 @@ jobs:
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
           echo "Using bundle: $BUNDLE"
           
-          # ===== 1. Unique temp paths =====
-          TMPREPO=$(mktemp -d)/repo
-          APP_EXTRACT=$(mktemp -d)/app
-          FINAL_REPO=$(mktemp -d)/repo
+          TMPREPO=/tmp/ayugram_tmprepo
+          FINAL_REPO=/tmp/ayugram_finalrepo
+          APP_EXTRACT=/tmp/ayugram_app
           
-          echo "TMPREPO=$TMPREPO"
-          echo "APP_EXTRACT=$APP_EXTRACT"
-          echo "FINAL_REPO=$FINAL_REPO"
+          # ===== 1. Cleanup =====
+          rm -rf "$TMPREPO" "$FINAL_REPO" "$APP_EXTRACT"
           
-          # ===== 2. Import bundle — flatpak o'zi repo yaratadi =====
+          # ===== 2. TMPREPO yaratish va bundle import =====
+          mkdir -p "$TMPREPO"
+          ostree init --repo="$TMPREPO" --mode=archive-z2
           flatpak build-import-bundle "$TMPREPO" "$BUNDLE"
           
           # ===== 3. App fayllarini chiqarish =====
           mkdir -p "$APP_EXTRACT"
           ostree --repo="$TMPREPO" checkout app/com.ayugram.desktop/x86_64/master "$APP_EXTRACT"
           
-          # ===== 4. Metainfo faylini tuzatish =====
+          # ===== 4. Metainfo tuzatish =====
           echo "=== Metainfo files ==="
           find "$APP_EXTRACT" -name "*.metainfo.xml" -o -name "*.appdata.xml" 2>/dev/null
           
@@ -93,7 +93,7 @@ jobs:
             grep -E 'type=' "$file" | head -5 || true
           done
           
-          # ===== 5. Yangi repo, stable branch =====
+          # ===== 5. FINAL_REPO yaratish va stable branch bilan eksport =====
           mkdir -p "$FINAL_REPO"
           ostree init --repo="$FINAL_REPO" --mode=archive-z2
           
