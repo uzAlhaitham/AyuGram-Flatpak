@@ -31,20 +31,22 @@ jobs:
           mkdir -p public
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
           echo "Using bundle: $BUNDLE"
-          
-          # Bo'sh repozitoriya yaratish
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
-          
-          # .flatpak faylni repoga import qilish
           flatpak build-import-bundle repo "$BUNDLE"
-          
-          # Repo metama'lumotlarini yangilash
           flatpak build-update-repo repo
-          
-          # Natijani public papkaga ko'chirish
           mv repo public/repo
           cp ayugram.flatpakrepo public/
+          cat > public/index.html << 'HTML'
+          <!DOCTYPE html>
+          <html>
+          <head><title>AyuGram Flatpak Repo</title></head>
+          <body>
+          <h1>AyuGram Flatpak Repozitoriyasi</h1>
+          <p>Repo manzili: <code>https://uzAlhaitham.github.io/AyuGram-Flatpak/ayugram.flatpakrepo</code></p>
+          </body>
+          </html>
+          HTML
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
