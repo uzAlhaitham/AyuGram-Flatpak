@@ -50,23 +50,13 @@ jobs:
           sleep 1
           gpg-connect-agent /bye || true
           sleep 1
-          
           echo "$GPG_PRIVATE_KEY_B64" | base64 -d | gpg --batch --import
           gpg --list-secret-keys --keyid-format=long
-          
           KEYGRIPS=$(gpg --with-keygrip --list-secret-keys "$GPG_FINGERPRINT" | grep "Keygrip" | awk '{print $3}')
-          echo "Keygrips:"
-          echo "$KEYGRIPS"
-          
           PRESET=$(find /usr/lib -name gpg-preset-passphrase 2>/dev/null | head -n1)
-          echo "Preset binary: $PRESET"
-          
           for KG in $KEYGRIPS; do
-            echo "Presetting passphrase for keygrip: $KG"
             echo "$GPG_PASSPHRASE" | "$PRESET" --preset "$KG" || true
           done
-          
-          echo "test" | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --clearsign | head -n1
 
       - name: Build Flatpak repository
         env:
@@ -78,21 +68,19 @@ jobs:
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
           
-          # 1. Import qilishda ham commitni imzolash
+          # MUHIM: --branch=stable qo'shildi
           flatpak build-import-bundle \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
+              --branch=stable \
               repo "$BUNDLE"
           
-          # 2. Summary faylini imzolash
           flatpak build-update-repo \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
               repo
           
-          echo "=== Summary signature check ==="
           ls -la repo/summary*
-          
           mv repo public/repo
           cp ayugram.flatpakrepo public/
           cat > public/index.html << 'HTML'
