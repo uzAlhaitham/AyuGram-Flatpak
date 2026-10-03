@@ -26,24 +26,42 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y flatpak ostree gnupg
 
-      - name: Import GPG key
+      - name: Import and trust GPG key
         env:
           GPG_PRIVATE_KEY_B64: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
+          GNUPGHOME: /home/runner/.gnupg
         run: |
-          mkdir -p ~/.gnupg
-          chmod 700 ~/.gnupg
-          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
-          echo "use-agent" >> ~/.gnupg/gpg.conf
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+          
+          cat > "$GNUPGHOME/gpg.conf" << 'CONF'
+          use-agent
+          pinentry-mode loopback
+          no-tty
+          batch
+          CONF
+          
+          cat > "$GNUPGHOME/gpg-agent.conf" << 'CONF'
+          allow-loopback-pinentry
+          allow-preset-passphrase
+          CONF
+          
           gpgconf --kill gpg-agent || true
-          gpg-connect-agent reloadagent /bye || true
-
+          
           echo "$GPG_PRIVATE_KEY_B64" | base64 -d | gpg --batch --import
+          
+          # Set ultimate trust
+          echo -e "5\ny\n" | gpg --batch --command-fd 0 --edit-key "$GPG_FINGERPRINT" trust || true
+          
           gpg --list-secret-keys --keyid-format=long
+          gpg --list-keys
 
       - name: Build Flatpak repository
         env:
+          GNUPGHOME: /home/runner/.gnupg
           GPG_TTY: /dev/null
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
         run: |
           mkdir -p public
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
@@ -51,7 +69,12 @@ jobs:
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
           flatpak build-import-bundle repo "$BUNDLE"
-          flatpak build-update-repo --gpg-sign=${{ secrets.GPG_FINGERPRINT }} repo
+          
+          flatpak build-update-repo \
+            --gpg-sign="$GPG_FINGERPRINT" \
+            --gpg-homedir="$GNUPGHOME" \
+            repo
+          
           mv repo public/repo
           cp ayugram.flatpakrepo public/
           cat > public/index.html << 'HTML'
