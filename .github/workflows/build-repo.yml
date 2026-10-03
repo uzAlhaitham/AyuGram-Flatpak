@@ -30,39 +30,30 @@ jobs:
         env:
           GPG_PRIVATE_KEY_B64: ${{ secrets.GPG_PRIVATE_KEY }}
         run: |
-          # GPG home papkasini tayyorlash
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
-
-          # gpg.conf - pinentry muammosini hal qilish
+          
           cat > ~/.gnupg/gpg.conf << 'CONF'
           use-agent
           pinentry-mode loopback
           no-tty
           batch
-          no-permission-warning
           CONF
-
-          # gpg-agent.conf
+          
           cat > ~/.gnupg/gpg-agent.conf << 'CONF'
           allow-loopback-pinentry
-          allow-preset-passphrase
           CONF
-
+          
           chmod 600 ~/.gnupg/gpg.conf ~/.gnupg/gpg-agent.conf
-
-          # Agentni to'xtatib, qayta ishga tushirish
           gpgconf --kill gpg-agent || true
-          gpg-connect-agent /bye || true
-
-          # Kalitni import qilish
+          
           echo "$GPG_PRIVATE_KEY_B64" | base64 -d | gpg --batch --import
           gpg --list-secret-keys --keyid-format=long
 
       - name: Build Flatpak repository
         env:
           GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
-          GPG_TTY: ""
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           mkdir -p public
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
@@ -70,22 +61,20 @@ jobs:
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
           flatpak build-import-bundle repo "$BUNDLE"
-
-          # Imzosiz summary yaratish
+          
           flatpak build-update-repo repo
-
-          # Summary faylini gpg bilan qo'lda imzolash (loopback bilan)
+          
           gpg --batch --yes \
               --pinentry-mode loopback \
-              --passphrase "" \
+              --passphrase "$GPG_PASSPHRASE" \
               --detach-sign --armor \
               --local-user "$GPG_FINGERPRINT" \
               -o repo/summary.sig \
               repo/summary
-
+          
           echo "=== Signature created ==="
           ls -la repo/summary*
-
+          
           mv repo public/repo
           cp ayugram.flatpakrepo public/
           cat > public/index.html << 'HTML'
