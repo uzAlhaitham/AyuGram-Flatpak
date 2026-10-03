@@ -65,20 +65,56 @@ jobs:
           mkdir -p public
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
           echo "Using bundle: $BUNDLE"
+          
+          # 1. Setup temporary repo
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
           
-          flatpak build-import-bundle \
+          # 2. Import bundle (temporary, to get files)
+          flatpak build-import-bundle repo "$BUNDLE"
+          
+          # 3. Checkout app files to a directory
+          rm -rf /tmp/app
+          mkdir -p /tmp/app
+          ostree --repo=repo checkout app/com.ayugram.desktop/x86_64/master /tmp/app
+          
+          # 4. Inspect and modify metainfo
+          echo "=== Metainfo files found ==="
+          find /tmp/app -name "*.metainfo.xml" -o -name "*.appdata.xml" 2>/dev/null
+          echo ""
+          
+          find /tmp/app \( -name "*.metainfo.xml" -o -name "*.appdata.xml" \) -print0 | while IFS= read -r -d '' file; do
+            echo "--- Processing: $file ---"
+            echo "Before:"
+            grep -E 'type=' "$file" | head -20 || true
+            sed -i 's/type="development"/type="stable"/g' "$file"
+            sed -i 's/type="snapshot"/type="stable"/g' "$file"
+            echo "After:"
+            grep -E 'type=' "$file" | head -20 || true
+          done
+          
+          # 5. Recreate repo cleanly
+          rm -rf repo
+          mkdir -p repo
+          ostree init --repo=repo --mode=archive-z2
+          
+          # 6. Export modified app
+          flatpak build-export \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
-              repo "$BUNDLE"
+              repo /tmp/app com.ayugram.desktop master
           
+          # 7. Update repo with GPG signing
           flatpak build-update-repo \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
               repo
           
+          # Show results
+          echo ""
+          echo "=== Summary files ==="
           ls -la repo/summary*
+          
           mv repo public/repo
           cp ayugram.flatpakrepo public/
           cat > public/index.html << 'HTML'
