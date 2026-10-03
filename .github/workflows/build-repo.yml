@@ -34,48 +34,38 @@ jobs:
         run: |
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
-          
           cat > ~/.gnupg/gpg.conf << 'CONF'
           use-agent
           pinentry-mode loopback
           no-tty
           CONF
-          
           cat > ~/.gnupg/gpg-agent.conf << 'CONF'
           allow-loopback-pinentry
           allow-preset-passphrase
           default-cache-ttl 34560000
           max-cache-ttl 34560000
           CONF
-          
           chmod 600 ~/.gnupg/gpg.conf ~/.gnupg/gpg-agent.conf
-          
-          # Agentni to'xtatib, yangi sozlamalar bilan qayta ishga tushirish
           gpgconf --kill gpg-agent || true
           sleep 1
           gpg-connect-agent /bye || true
           sleep 1
           
-          # Kalitni import qilish
           echo "$GPG_PRIVATE_KEY_B64" | base64 -d | gpg --batch --import
           gpg --list-secret-keys --keyid-format=long
           
-          # Keygrip olish (asosiy kalit va subkey uchun)
           KEYGRIPS=$(gpg --with-keygrip --list-secret-keys "$GPG_FINGERPRINT" | grep "Keygrip" | awk '{print $3}')
           echo "Keygrips:"
           echo "$KEYGRIPS"
           
-          # gpg-preset-passphrase topish
           PRESET=$(find /usr/lib -name gpg-preset-passphrase 2>/dev/null | head -n1)
           echo "Preset binary: $PRESET"
           
-          # Har bir keygrip uchun parolni keshga yuklash
           for KG in $KEYGRIPS; do
             echo "Presetting passphrase for keygrip: $KG"
             echo "$GPG_PASSPHRASE" | "$PRESET" --preset "$KG" || true
           done
           
-          # Tekshirish
           echo "test" | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --clearsign | head -n1
 
       - name: Build Flatpak repository
@@ -89,10 +79,9 @@ jobs:
           ostree init --repo=repo --mode=archive-z2
           flatpak build-import-bundle repo "$BUNDLE"
           
-          flatpak build-update-repo \
-              --gpg-sign="$GPG_FINGERPRINT" \
-              --gpg-homedir="$HOME/.gnupg" \
-              repo
+          # Avval oddiy update, keyin ostree orqali to'liq imzolash
+          flatpak build-update-repo repo
+          ostree summary -u --gpg-sign="$GPG_FINGERPRINT" --gpg-homedir="$HOME/.gnupg" repo
           
           echo "=== Summary signature check ==="
           ls -la repo/summary*
