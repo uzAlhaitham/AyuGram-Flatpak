@@ -79,9 +79,13 @@ jobs:
           ostree init --repo=repo --mode=archive-z2
           flatpak build-import-bundle repo "$BUNDLE"
           
-          # Avval oddiy update, keyin ostree orqali to'liq imzolash
+          # Avval summary'ni imzosiz yaratish
           flatpak build-update-repo repo
-          ostree summary -u --gpg-sign="$GPG_FINGERPRINT" --gpg-homedir="$HOME/.gnupg" repo
+          
+          # Endi summary'ni GPG bilan qayta imzolash
+          ostree --repo=repo summary -u \
+              --gpg-sign="$GPG_FINGERPRINT" \
+              --gpg-homedir="$HOME/.gnupg"
           
           echo "=== Summary signature check ==="
           ls -la repo/summary*
