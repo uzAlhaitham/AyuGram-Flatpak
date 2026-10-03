@@ -26,9 +26,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y flatpak ostree gnupg
 
-      - name: Import GPG key
+      - name: Import GPG key and remove passphrase
         env:
           GPG_PRIVATE_KEY_B64: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
         run: |
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
@@ -43,13 +45,23 @@ jobs:
           CONF
           chmod 600 ~/.gnupg/gpg.conf ~/.gnupg/gpg-agent.conf
           gpgconf --kill gpg-agent || true
+          
+          # Kalitni import qilish
           echo "$GPG_PRIVATE_KEY_B64" | base64 -d | gpg --batch --import
+          
+          # Parolni olib tashlash
+          gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+              --command-fd 0 --edit-key "$GPG_FINGERPRINT" <<EOF
+          passwd
+          $GPG_PASSPHRASE
+
+          EOF
+          
           gpg --list-secret-keys --keyid-format=long
 
       - name: Build Flatpak repository
         env:
           GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           mkdir -p public
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
@@ -58,7 +70,7 @@ jobs:
           ostree init --repo=repo --mode=archive-z2
           flatpak build-import-bundle repo "$BUNDLE"
           
-          # Eng muhim o'zgarish: summary'ni to'g'ridan-to'g'ri imzolash
+          # Endi parol yo'q, shuning uchun bu ishlaydi
           flatpak build-update-repo \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
