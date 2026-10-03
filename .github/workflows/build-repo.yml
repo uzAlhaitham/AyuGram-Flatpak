@@ -68,11 +68,9 @@ jobs:
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
           
-          # MUHIM: --branch=stable qo'shildi
           flatpak build-import-bundle \
               --gpg-sign="$GPG_FINGERPRINT" \
               --gpg-homedir="$HOME/.gnupg" \
-              --branch=stable \
               repo "$BUNDLE"
           
           flatpak build-update-repo \
