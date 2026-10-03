@@ -24,9 +24,54 @@ jobs:
       - name: Install flatpak and ostree
         run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak ostree
+          sudo apt-get install -y flatpak ostree gnupg
+
+      - name: Import GPG key and preset passphrase
+        env:
+          GPG_PRIVATE_KEY_B64: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
+        run: |
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          
+          cat > ~/.gnupg/gpg.conf << 'CONF'
+          use-agent
+          pinentry-mode loopback
+          no-tty
+          CONF
+          
+          cat > ~/.gnupg/gpg-agent.conf << 'CONF'
+          allow-loopback-pinentry
+          default-cache-ttl 34560000
+          max-cache-ttl 34560000
+          CONF
+          
+          chmod 600 ~/.gnupg/gpg.conf ~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent || true
+          gpg-connect-agent /bye || true
+          
+          # Kalitni import qilish
+          echo "$GPG_PRIVATE_KEY_B64" | base64 -d | gpg --batch --import
+          gpg --list-secret-keys --keyid-format=long
+          
+          # Keygrip olish
+          KEYGRIP=$(gpg --with-keygrip --list-secret-keys "$GPG_FINGERPRINT" | grep Keygrip | head -n1 | awk '{print $3}')
+          echo "Keygrip: $KEYGRIP"
+          
+          # gpg-preset-passphrase topish
+          PRESET=$(find /usr/lib -name gpg-preset-passphrase 2>/dev/null | head -n1)
+          echo "Preset binary: $PRESET"
+          
+          # Parolni gpg-agent'ga keshga yuklash
+          echo "$GPG_PASSPHRASE" | "$PRESET" --preset "$KEYGRIP"
+          
+          # Tekshirish
+          echo "test" | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --clearsign | head -n1
 
       - name: Build Flatpak repository
+        env:
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
         run: |
           mkdir -p public
           BUNDLE=$(ls ayugram-desktop-*.flatpak | head -n1)
@@ -34,7 +79,16 @@ jobs:
           mkdir -p repo
           ostree init --repo=repo --mode=archive-z2
           flatpak build-import-bundle repo "$BUNDLE"
-          flatpak build-update-repo repo
+          
+          # Endi gpg-agent'da parol keshda, gpgme ishlaydi
+          flatpak build-update-repo \
+              --gpg-sign="$GPG_FINGERPRINT" \
+              --gpg-homedir="$HOME/.gnupg" \
+              repo
+          
+          echo "=== Summary signature check ==="
+          ls -la repo/summary*
+          
           mv repo public/repo
           cp ayugram.flatpakrepo public/
           cat > public/index.html << 'HTML'
