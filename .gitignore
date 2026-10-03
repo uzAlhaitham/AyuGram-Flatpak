@@ -1,0 +1,8 @@
+# Maxfiy fayllar
+private.key
+private.key.b64
+public.key
+*.key
+
+# Katta fayllar
+*.flatpak
